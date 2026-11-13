@@ -67,6 +67,9 @@ absl::FormatConvertResult<absl::FormatConversionCharSet::kString> AbslFormatConv
         case Surface::Type::MetalLayer:
             s->Append("MetalLayer");
             break;
+        case Surface::Type::Kmsdrm:
+            s->Append("KMSDRM");
+            break;
         case Surface::Type::WaylandSurface:
             s->Append("WaylandSurface");
             break;
@@ -116,6 +119,7 @@ ResultOrError<UnpackedPtr<SurfaceDescriptor>> ValidateSurfaceDescriptor(
     DAWN_TRY_ASSIGN(
         type, (descriptor.ValidateBranches<
                   Branch<SurfaceSourceAndroidNativeWindow>, Branch<SurfaceSourceMetalLayer>,
+                  Branch<SurfaceSourceKmsdrm>,
                   Branch<SurfaceSourceWindowsHWND>, Branch<SurfaceDescriptorFromWindowsCoreWindow>,
                   Branch<SurfaceDescriptorFromWindowsUWPSwapChainPanel>,
                   Branch<SurfaceDescriptorFromWindowsWinUISwapChainPanel>,
@@ -140,6 +144,13 @@ ResultOrError<UnpackedPtr<SurfaceDescriptor>> ValidateSurfaceDescriptor(
             return descriptor;
         }
 #endif  // defined(DAWN_ENABLE_BACKEND_METAL)
+        case wgpu::SType::SurfaceSourceKmsdrm: {
+            auto* subDesc = descriptor.Get<SurfaceSourceKmsdrm>();
+            DAWN_ASSERT(subDesc != nullptr);
+            DAWN_INVALID_IF(subDesc->createSurface == nullptr, "KMSDRM surface callback is nullptr.");
+            DAWN_INVALID_IF(subDesc->userdata == nullptr, "KMSDRM surface userdata is nullptr.");
+            return descriptor;
+        }
 #if DAWN_PLATFORM_IS(WIN32)
         case wgpu::SType::SurfaceSourceWindowsHWND: {
             auto* subDesc = descriptor.Get<SurfaceSourceWindowsHWND>();
@@ -313,6 +324,7 @@ Surface::Surface(InstanceBase* instance, const UnpackedPtr<SurfaceDescriptor>& d
         descriptor
             .ValidateBranches<
                 Branch<SurfaceSourceAndroidNativeWindow>, Branch<SurfaceSourceMetalLayer>,
+                Branch<SurfaceSourceKmsdrm>,
                 Branch<SurfaceSourceWindowsHWND>, Branch<SurfaceDescriptorFromWindowsCoreWindow>,
                 Branch<SurfaceDescriptorFromWindowsUWPSwapChainPanel>,
                 Branch<SurfaceDescriptorFromWindowsWinUISwapChainPanel>,
@@ -330,6 +342,13 @@ Surface::Surface(InstanceBase* instance, const UnpackedPtr<SurfaceDescriptor>& d
             auto* subDesc = descriptor.Get<SurfaceSourceMetalLayer>();
             mType = Type::MetalLayer;
             mMetalLayer = subDesc->layer;
+            break;
+        }
+        case wgpu::SType::SurfaceSourceKmsdrm: {
+            auto* subDesc = descriptor.Get<SurfaceSourceKmsdrm>();
+            mType = Type::Kmsdrm;
+            mKmsdrmUserdata = subDesc->userdata;
+            mKmsdrmCreateSurface = subDesc->createSurface;
             break;
         }
         case wgpu::SType::SurfaceSourceWindowsHWND: {
@@ -486,6 +505,18 @@ uint64_t Surface::GetXWindow() const {
     DAWN_CHECK(!IsError());
     DAWN_CHECK(mType == Type::XlibWindow);
     return mXWindow;
+}
+
+void* Surface::GetKmsdrmUserdata() const {
+    DAWN_CHECK(!IsError());
+    DAWN_CHECK(mType == Type::Kmsdrm);
+    return mKmsdrmUserdata;
+}
+
+wgpu::KmsdrmSurfaceCreateCallback Surface::GetKmsdrmCreateSurface() const {
+    DAWN_CHECK(!IsError());
+    DAWN_CHECK(mType == Type::Kmsdrm);
+    return mKmsdrmCreateSurface;
 }
 
 MaybeError Surface::Configure(const SurfaceConfiguration* configIn) {

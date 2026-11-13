@@ -605,6 +605,19 @@ ResultOrError<VkSurfaceKHR> CreateVulkanSurface(InstanceBase* instance,
     [[maybe_unused]] VkInstance vkInstance = physicalDevice->GetVulkanInstance()->GetVkInstance();
 
     switch (surface->GetType()) {
+        case Surface::Type::Kmsdrm: {
+            DAWN_INVALID_IF(!info.HasExt(InstanceExt::Display),
+                            "Vulkan display extension is not available.");
+            VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
+            void* nativeSurface = nullptr;
+            const auto createSurface = surface->GetKmsdrmCreateSurface();
+            DAWN_INVALID_IF(!createSurface(surface->GetKmsdrmUserdata(),
+                                           reinterpret_cast<void*>(vkInstance), &nativeSurface),
+                            "SDL failed to create the KMSDRM Vulkan surface.");
+            DAWN_INVALID_IF(nativeSurface == nullptr, "SDL returned a null KMSDRM Vulkan surface.");
+            vkSurface = VkSurfaceKHR::CreateFromHandle(reinterpret_cast<::VkSurfaceKHR>(nativeSurface));
+            return vkSurface;
+        }
 #if defined(DAWN_ENABLE_BACKEND_METAL)
         case Surface::Type::MetalLayer:
             if (info.HasExt(InstanceExt::MetalSurface)) {

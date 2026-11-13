@@ -79,6 +79,7 @@ class Surface final : public ErrorMonad {
         Undefined,
         AndroidWindow,
         MetalLayer,
+        Kmsdrm,
         WaylandSurface,
         WindowsHWND,
         WindowsCoreWindow,
@@ -120,6 +121,10 @@ class Surface final : public ErrorMonad {
     // Valid to call if the type is WindowsXlib
     void* GetXDisplay() const;
     uint64_t GetXWindow() const;
+
+    // Valid to call if the type is Kmsdrm
+    void* GetKmsdrmUserdata() const;
+    wgpu::KmsdrmSurfaceCreateCallback GetKmsdrmCreateSurface() const;
 
     const std::string& GetLabel() const;
 
@@ -166,6 +171,10 @@ class Surface final : public ErrorMonad {
 
     // NWindow
     raw_ptr<void> mSwitchNWindow = nullptr;
+
+    // KMSDRM surface creation is delegated to the SDL windowing layer.
+    raw_ptr<void> mKmsdrmUserdata = nullptr;
+    wgpu::KmsdrmSurfaceCreateCallback mKmsdrmCreateSurface = nullptr;
 
     // Wayland
     raw_ptr<void> mWaylandDisplay = nullptr;
