@@ -55,6 +55,7 @@ class SwapChainEGL final : public SwapChainBase {
     MaybeError CreateEGLSurface(const DisplayEGL* display);
 
     EGLSurface mEGLSurface = EGL_NO_SURFACE;
+    bool mOwnsEGLSurface = true;
     Ref<Texture> mTexture;
     Ref<TextureView> mTextureView;
 

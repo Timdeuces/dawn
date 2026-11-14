@@ -611,7 +611,7 @@ ResultOrError<VkSurfaceKHR> CreateVulkanSurface(InstanceBase* instance,
             VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
             void* nativeSurface = nullptr;
             const auto createSurface = surface->GetKmsdrmCreateSurface();
-            DAWN_INVALID_IF(!createSurface(surface->GetKmsdrmUserdata(),
+            DAWN_INVALID_IF(createSurface == nullptr || !createSurface(surface->GetKmsdrmUserdata(),
                                            reinterpret_cast<void*>(vkInstance), &nativeSurface),
                             "SDL failed to create the KMSDRM Vulkan surface.");
             DAWN_INVALID_IF(nativeSurface == nullptr, "SDL returned a null KMSDRM Vulkan surface.");

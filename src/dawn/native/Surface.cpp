@@ -147,8 +147,11 @@ ResultOrError<UnpackedPtr<SurfaceDescriptor>> ValidateSurfaceDescriptor(
         case wgpu::SType::SurfaceSourceKmsdrm: {
             auto* subDesc = descriptor.Get<SurfaceSourceKmsdrm>();
             DAWN_ASSERT(subDesc != nullptr);
-            DAWN_INVALID_IF(subDesc->createSurface == nullptr, "KMSDRM surface callback is nullptr.");
             DAWN_INVALID_IF(subDesc->userdata == nullptr, "KMSDRM surface userdata is nullptr.");
+            const bool hasVulkanCallbacks = subDesc->createSurface != nullptr;
+            const bool hasEGLCallbacks = subDesc->getEGLSurface != nullptr && subDesc->present != nullptr;
+            DAWN_INVALID_IF(!hasVulkanCallbacks && !hasEGLCallbacks,
+                            "KMSDRM surface requires Vulkan or EGL callbacks.");
             return descriptor;
         }
 #if DAWN_PLATFORM_IS(WIN32)
@@ -349,6 +352,8 @@ Surface::Surface(InstanceBase* instance, const UnpackedPtr<SurfaceDescriptor>& d
             mType = Type::Kmsdrm;
             mKmsdrmUserdata = subDesc->userdata;
             mKmsdrmCreateSurface = subDesc->createSurface;
+            mKmsdrmEGLSurface = subDesc->getEGLSurface;
+            mKmsdrmPresent = subDesc->present;
             break;
         }
         case wgpu::SType::SurfaceSourceWindowsHWND: {
@@ -517,6 +522,18 @@ wgpu::KmsdrmSurfaceCreateCallback Surface::GetKmsdrmCreateSurface() const {
     DAWN_CHECK(!IsError());
     DAWN_CHECK(mType == Type::Kmsdrm);
     return mKmsdrmCreateSurface;
+}
+
+wgpu::KmsdrmEGLSurfaceCallback Surface::GetKmsdrmEGLSurface() const {
+    DAWN_CHECK(!IsError());
+    DAWN_CHECK(mType == Type::Kmsdrm);
+    return mKmsdrmEGLSurface;
+}
+
+wgpu::KmsdrmPresentCallback Surface::GetKmsdrmPresent() const {
+    DAWN_CHECK(!IsError());
+    DAWN_CHECK(mType == Type::Kmsdrm);
+    return mKmsdrmPresent;
 }
 
 MaybeError Surface::Configure(const SurfaceConfiguration* configIn) {

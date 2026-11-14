@@ -586,6 +586,20 @@
             }
         ]
     },
+    "dawn store cache data callback info": {
+        "tags": [
+            "dawn",
+            "native"
+        ],
+        "category": "callback info",
+        "members": [
+            {
+                "name": "callback",
+                "type": "dawn store cache data callback",
+                "default": "nullptr"
+            }
+        ]
+    },
     "kmsdrm surface create callback": {
         "tags": [
             "dawn",
@@ -609,17 +623,36 @@
             }
         ]
     },
-    "dawn store cache data callback info": {
+    "kmsdrm EGL surface callback": {
         "tags": [
             "dawn",
             "native"
         ],
-        "category": "callback info",
-        "members": [
+        "category": "function pointer",
+        "returns": "bool",
+        "args": [
             {
-                "name": "callback",
-                "type": "dawn store cache data callback",
-                "default": "nullptr"
+                "name": "userdata",
+                "type": "void *"
+            },
+            {
+                "name": "surface",
+                "type": "void *",
+                "annotation": "*"
+            }
+        ]
+    },
+    "kmsdrm present callback": {
+        "tags": [
+            "dawn",
+            "native"
+        ],
+        "category": "function pointer",
+        "returns": "bool",
+        "args": [
+            {
+                "name": "userdata",
+                "type": "void *"
             }
         ]
     },
@@ -8743,6 +8776,14 @@
             {
                 "name": "create surface",
                 "type": "kmsdrm surface create callback"
+            },
+            {
+                "name": "get EGL surface",
+                "type": "kmsdrm EGL surface callback"
+            },
+            {
+                "name": "present",
+                "type": "kmsdrm present callback"
             }
         ]
     },

@@ -79,6 +79,7 @@ MaybeError SwapChainEGL::Initialize(SwapChainBase* previousSwapChain) {
             SwapChainEGL* previousEGLSwapChain =
                 reinterpret_cast<SwapChainEGL*>(ToBackend(previousSwapChain));
             std::swap(previousEGLSwapChain->mEGLSurface, mEGLSurface);
+            std::swap(previousEGLSwapChain->mOwnsEGLSurface, mOwnsEGLSurface);
         }
 
         previousSwapChain->DetachFromSurface();
@@ -147,7 +148,13 @@ MaybeError SwapChainEGL::PresentImpl() {
 
         DAWN_GL_TRY(gl, DeleteFramebuffers(1, &readFbo));
 
-        egl.SwapBuffers(display, mEGLSurface);
+        if (GetSurface()->GetType() == Surface::Type::Kmsdrm) {
+            const auto present = GetSurface()->GetKmsdrmPresent();
+            DAWN_INVALID_IF(!present(GetSurface()->GetKmsdrmUserdata()),
+                            "SDL failed to present the KMSDRM EGL surface.");
+        } else {
+            egl.SwapBuffers(display, mEGLSurface);
+        }
         DAWN_TRY(scopedCurrentContext.End());
     }
 
@@ -176,11 +183,12 @@ ResultOrError<SwapChainTextureInfo> SwapChainEGL::GetCurrentTextureImpl() {
 }
 
 void SwapChainEGL::DetachFromSurfaceImpl() {
-    if (mEGLSurface != EGL_NO_SURFACE) {
+    if (mEGLSurface != EGL_NO_SURFACE && mOwnsEGLSurface) {
         Device* device = ToBackend(GetDevice());
         device->GetEGL(false).DestroySurface(device->GetEGLDisplay(), mEGLSurface);
-        mEGLSurface = EGL_NO_SURFACE;
     }
+    mEGLSurface = EGL_NO_SURFACE;
+    mOwnsEGLSurface = true;
 
     if (mTexture != nullptr) {
         mTexture->APIDestroy();
@@ -192,6 +200,19 @@ void SwapChainEGL::DetachFromSurfaceImpl() {
 MaybeError SwapChainEGL::CreateEGLSurface(const DisplayEGL* display) {
     DAWN_ASSERT(mEGLSurface == EGL_NO_SURFACE);
 
+    Surface* surface = GetSurface();
+    if (surface->GetType() == Surface::Type::Kmsdrm) {
+        const auto getEGLSurface = surface->GetKmsdrmEGLSurface();
+        void* nativeSurface = nullptr;
+        DAWN_INVALID_IF(getEGLSurface == nullptr ||
+                            !getEGLSurface(surface->GetKmsdrmUserdata(), &nativeSurface),
+                        "SDL failed to provide the KMSDRM EGL surface.");
+        DAWN_INVALID_IF(nativeSurface == nullptr, "SDL returned a null KMSDRM EGL surface.");
+        mEGLSurface = reinterpret_cast<EGLSurface>(nativeSurface);
+        mOwnsEGLSurface = false;
+        return {};
+    }
+
     EGLConfig config = display->ChooseConfig(EGL_WINDOW_BIT, GetFormat());
     if (config == kNoConfig) {
         return DAWN_FORMAT_INTERNAL_ERROR("Couldn't find an EGLConfig for %s on %s.", GetFormat(),
@@ -201,8 +222,6 @@ MaybeError SwapChainEGL::CreateEGLSurface(const DisplayEGL* display) {
     // [[maybe_unused]] to prevent unused variable warnings when platform code is disabled.
     [[maybe_unused]] const EGLFunctions& egl = display->egl.get();
     [[maybe_unused]] EGLDisplay eglDisplay = display->GetDisplay();
-    Surface* surface = GetSurface();
-
     absl::InlinedVector<EGLint, 3> attribs;
     auto AddAttrib = [&](EGLint attrib, EGLint value) {
         attribs.push_back(attrib);
